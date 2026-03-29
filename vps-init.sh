@@ -408,9 +408,15 @@ create_admin_user() {
             if ! command -v sudo >/dev/null; then
                 ${PM} install -y sudo
             fi
-            # 确保 wheel 组有 sudo 权限
-            if ! grep -q "^%wheel" /etc/sudoers; then
-                echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+            # 确保 wheel 组有 sudo 权限 - 使用更安全的方法
+            if grep -q "^# %wheel.*ALL=(ALL).*ALL" /etc/sudoers; then
+                # 取消注释已存在的配置
+                sed -i 's/^# %wheel\(.*\)ALL=(ALL)\(.*\)ALL/%wheel\1ALL=(ALL)\2ALL/' /etc/sudoers
+                log_info "已启用 wheel 组的 sudo 权限"
+            elif ! grep -q "^%wheel.*ALL=(ALL).*ALL" /etc/sudoers; then
+                # 如果完全不存在，使用 visudo 方式添加
+                echo "%wheel ALL=(ALL) ALL" | EDITOR='tee -a' visudo
+                log_info "已添加 wheel 组的 sudo 权限"
             fi
         fi
         
