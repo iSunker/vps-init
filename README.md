@@ -47,7 +47,6 @@
 curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh && curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/create_admin.sh && bash vps-init.sh && bash create_admin.sh
 
 ```
-*(注：请将上述链接中的 `您的用户名/您的仓库名` 替换为您实际的 GitHub 路径)*
 
 ---
 
@@ -57,44 +56,3 @@ curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh && c
 2. **SSH 端口修改警告**：如果您在脚本运行过程中选择了修改 SSH 端口，**请务必记住您输入的新端口号**。脚本执行完毕后，强烈建议保持当前 SSH 终端不关闭，重新打开一个新的终端窗口，使用新端口尝试连接，验证成功后再关闭原窗口 [1]。
 3. **Zsh 切换**：脚本配置完 Zsh 后，可能需要您重新连接 SSH 或注销重新登录才能看到终端美化效果。
 4. **清理工作**：脚本在最后会自动执行系统清理命令（如 `apt autoremove` 和 `apt clean`）以释放磁盘空间 [1]。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# vps-init   VPS 一键初始化脚本
-
-# 快速使用
-
-#在新 VPS 上以root用户执行:
-
-curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh && curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/create_admin.sh && bash vps-init.sh && bash create_admin.sh
-
-功能特性
-✅ 系统更新
-✅ 时区设置(上海)
-✅ BBR 加速
-✅ 2GB Swap
-✅ Docker & Docker Compose
-✅ Fail2Ban 防护
-✅ Oh-My-Zsh
