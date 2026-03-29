@@ -44,10 +44,8 @@
 
 ```bash
 # 下载脚本
-curl -O https://raw.githubusercontent.com/您的用户名/您的仓库名/main/vps-init.sh
+curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh && curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/create_admin.sh && bash vps-init.sh && bash create_admin.sh
 
-# 赋予执行权限并运行
-bash vps-init.sh
 ```
 *(注：请将上述链接中的 `您的用户名/您的仓库名` 替换为您实际的 GitHub 路径)*
 
