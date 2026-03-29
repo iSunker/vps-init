@@ -4,15 +4,7 @@
 
 #在新 VPS 上以root用户执行:
 
-#方法1：直接执行
-curl -fsSL https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh | bash
-
-#方法2：先下载再执行
-curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh
-
-chmod +x vps-init.sh
-
-./vps-init.sh
+curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh && curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/create_admin.sh && bash vps-init.sh && bash create_admin.sh
 
 功能特性
 ✅ 系统更新
