@@ -41,8 +41,14 @@ detect_distribution() {
 update_system() {
     log_info "开始更新系统..."
     if [ "${PM}" = "apt" ]; then
+        # 设置非交互模式，避免配置文件冲突提示
+        export DEBIAN_FRONTEND=noninteractive
         apt update
-        apt upgrade --only-upgrade -y
+        # --force-confold: 保留旧配置文件
+        # --force-confdef: 使用默认选项
+        apt upgrade --only-upgrade -y \
+            -o Dpkg::Options::="--force-confold" \
+            -o Dpkg::Options::="--force-confdef"
     elif [ "${PM}" = "yum" ]; then
         yum update -y
     fi
