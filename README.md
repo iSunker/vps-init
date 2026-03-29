@@ -1,6 +1,4 @@
-# vps-init
-
-# VPS 一键初始化脚本
+# vps-init   VPS 一键初始化脚本
 
 # 快速使用
 
