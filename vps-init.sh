@@ -17,6 +17,7 @@ echo -e "${YELLOW}[WARN]${NC} $1"
 log_error() {
 echo -e "${RED}[ERROR]${NC} $1"
 }  
+
 detect_distribution() {
 local supported_distributions=("ubuntu" "debian" "centos" "fedora")
 if [ -f /etc/os-release ]; then
@@ -36,7 +37,7 @@ exit 1
 fi
 }
 
-# 更新组件,包管理
+# 更新组件,包管理 (已去除 sudo)
 update_system() {
 log_info "开始更新系统..."
 if [ "${PM}" = "apt" ]; then
@@ -64,6 +65,8 @@ return 0
 ;;
 esac
 }  
+
+# 安装工具函数 (已去除 sudo)
 install_tool() {
 local name=$1
 local description=$2
@@ -84,6 +87,8 @@ else
 log_info "跳过安装 ${name}"
 fi
 }  
+
+# 无询问安装工具函数 (已去除 sudo)
 install_tool_no_ask() {
 local name=$1
 if command -v "${name}" &>/dev/null; then
@@ -114,6 +119,7 @@ else
 log_info "跳过时区设置"
 fi
 }  
+
 set_language() {
 if ask_user "设置系统语言为英语" "将系统语言修改为 English (en_US.UTF-8)"; then
 log_info "正在设置语言环境..."
@@ -142,6 +148,7 @@ else
 log_info "跳过语言设置"
 fi
 }  
+
 enable_bbr() {
 if ask_user "开启 BBR" "拥塞控制算法,提升网络速度"; then
 log_info "正在检查并配置 BBR..."
@@ -161,6 +168,7 @@ log_info "BBR 已开启"
 fi
 fi
 }  
+
 configure_swap() {
 if ask_user "增加 2GB Swap" "虚拟内存,防止小内存机器死机"; then
 log_info "正在配置 Swap..."
@@ -180,6 +188,7 @@ free -h
 fi
 fi
 }  
+
 optimize_dns() {
 if ask_user "优化 DNS 解析" "使用 Google (8.8.8.8) 和 Cloudflare (1.1.1.1) DNS"; then
 log_info "正在优化 DNS..."
@@ -189,6 +198,7 @@ echo "nameserver 1.1.1.1" >> /etc/resolv.conf
 log_info "DNS 已更新"
 fi
 }  
+
 install_fail2ban() {
 if ask_user "安装 Fail2Ban" "防止 SSH 暴力破解"; then
 log_info "正在安装 Fail2Ban..."
@@ -198,6 +208,7 @@ systemctl start fail2ban
 log_info "Fail2Ban 安装并启动成功"
 fi
 }  
+
 remove_cloud_init() {
 if ask_user "卸载 Cloud-init" "Netcup/VPS 镜像自带工具,装完系统后卸载可加快开机"; then
 log_info "正在清理 Cloud-init..."
@@ -211,7 +222,7 @@ log_info "Cloud-init 清理完成"
 fi
 }
 
-# --- 新增:Docker 安装函数 ---
+# --- Docker 安装函数 (已去除 sudo) ---
 install_docker() {
 if command -v docker >/dev/null; then
 log_info "Docker 已安装,跳过"
@@ -219,17 +230,13 @@ return 0
 fi  
 if ask_user "安装 Docker & Docker Compose" "使用官方脚本一键安装,包含 Compose 插件"; then
 log_info "正在下载并运行 Docker 安装脚本..."
-
 # 确保 curl 已安装
 install_tool_no_ask "curl"
-
 # 使用官方脚本
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
-
 # 清理脚本
 rm get-docker.sh
-
 # 启动 Docker
 log_info "启动 Docker 服务..."
 systemctl enable docker
@@ -247,6 +254,7 @@ else
 log_info "跳过 Docker 安装"
 fi
 }  
+
 system_cleanup() {
 log_info "正在执行系统清理..."
 if [ "${PM}" = "apt" ]; then
@@ -258,6 +266,7 @@ ${PM} clean all
 fi
 log_info "系统清理完成"
 }  
+
 config_zsh() {
 log_info "配置 zsh 主题"
 sed -i "s/^ZSH_THEME=.*/ZSH_THEME=\"ys\"/g" ~/.zshrc
@@ -274,6 +283,7 @@ log_info "设置 zsh 为默认 shell"
 chsh -s $(which zsh)
 log_info "zsh 配置完成"
 }  
+
 install_oh_my_zsh() {
 log_info "开始安装 oh-my-zsh..."
 if [ -d ~/.oh-my-zsh ]; then
@@ -286,6 +296,7 @@ cp ~/.oh-my-zsh/templates/zshrc.zsh-template ~/.zshrc
 config_zsh
 log_info "oh-my-zsh 安装完成"
 }  
+
 change_ssh_port() {
 if [ ! -f /etc/ssh/sshd_config ]; then
 log_error "/etc/ssh/sshd_config 文件不存在"
@@ -320,6 +331,7 @@ log_warn "建议保持当前连接,新开一个终端验证新端口是否可用
 configure_firewall "${SSH_PORT}"
 fi
 }  
+
 configure_firewall() {
 local port=$1
 if [ -z "$port" ]; then return; fi
@@ -348,10 +360,19 @@ log_warn "未知的系统类型,请手动配置防火墙规则"
 esac
 log_info "防火墙规则配置尝试完成"
 }  
+
 run_script() {
 log_info "开始运行脚本..."
 detect_distribution
 update_system
+
+# --- 新增：自动检测并安装 sudo ---
+if ! command -v sudo &>/dev/null; then
+    log_info "检测到系统缺失 sudo，正在自动安装..."
+    ${PM} install -y sudo
+    log_info "sudo 安装完成，已为后续账号管理打好基础。"
+fi
+# -----------------------------------
 
 # 基础配置
 set_timezone
@@ -369,10 +390,8 @@ install_tool "command-not-found" "命令建议工具"
 install_tool "curl" "命令行文件传输工具"
 install_tool "git" "分布式版本控制系统"
 
-# --- Docker 安装 (新增步骤) ---
+# Docker 安装
 install_docker
-
-# ---------------------------
 
 # 安全配置
 install_fail2ban
@@ -393,4 +412,5 @@ echo "=========================================="
 echo -e "${GREEN}🎉 所有优化及安装已完成!${NC}"
 echo "=========================================="
 }  
+
 run_script
