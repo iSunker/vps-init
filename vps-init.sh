@@ -39,9 +39,12 @@ fi
 # 更新组件,包管理
 update_system() {
 log_info "开始更新系统..."
+# 设置非交互模式，避免升级时弹出配置选择界面
+export DEBIAN_FRONTEND=noninteractive
 if [ "${PM}" = "apt" ]; then
-apt update
-apt upgrade --only-upgrade -y
+apt-get update
+# 使用 force-confold 和 force-confdef 默认保留旧配置，不再弹窗
+apt-get upgrade --only-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 elif [ "${PM}" = "yum" ]; then
 yum update -y
 fi
@@ -74,7 +77,12 @@ return 0
 fi
 if ask_user "安装 ${name}" "${description}"; then
 log_warn "${name} 未安装,正在安装..."
+export DEBIAN_FRONTEND=noninteractive
+if [ "${PM}" = "apt" ]; then
+${PM}-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" "${name}"
+else
 ${PM} install -y "${name}"
+fi
 if [ $? -eq 0 ]; then
 log_info "${name} 安装成功"
 else
@@ -93,7 +101,12 @@ log_info "${name} 已安装"
 return 0
 fi
 log_warn "${name} 未安装,正在安装..."
+export DEBIAN_FRONTEND=noninteractive
+if [ "${PM}" = "apt" ]; then
+${PM}-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" "${name}"
+else
 ${PM} install -y "${name}"
+fi
 if [ $? -eq 0 ]; then
 log_info "${name} 安装成功"
 else
@@ -120,9 +133,10 @@ fi
 set_language() {
 if ask_user "设置系统语言为英语" "将系统语言修改为 English (en_US.UTF-8)"; then
 log_info "正在设置语言环境..."
+export DEBIAN_FRONTEND=noninteractive
 if [ "${PM}" = "apt" ]; then
 if ! command -v locale-gen >/dev/null; then
-apt install -y locales
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" locales
 fi
 if [ -f /etc/locale.gen ]; then
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
@@ -209,8 +223,9 @@ fi
 remove_cloud_init() {
 if ask_user "卸载 Cloud-init" "Netcup/VPS 镜像自带工具,装完系统后卸载可加快开机"; then
 log_info "正在清理 Cloud-init..."
+export DEBIAN_FRONTEND=noninteractive
 if [ "${PM}" = "apt" ]; then
-apt purge cloud-init -y
+apt-get purge cloud-init -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
 ${PM} remove cloud-init -y
 fi
@@ -243,7 +258,6 @@ log_info "正在禁用 root 远程登录..."
 cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.root_backup.$(date +%Y%m%d_%H%M%S)"
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/g' /etc/ssh/sshd_config
 sed -i 's/^PermitRootLogin.*/PermitRootLogin no/g' /etc/ssh/sshd_config
-# 确保文件中有此配置
 if ! grep -q "^PermitRootLogin no" /etc/ssh/sshd_config; then
 echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 fi
@@ -293,9 +307,10 @@ fi
 
 system_cleanup() {
 log_info "正在执行系统清理..."
+export DEBIAN_FRONTEND=noninteractive
 if [ "${PM}" = "apt" ]; then
-apt autoremove -y
-apt clean
+apt-get autoremove -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+apt-get clean
 elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
 ${PM} autoremove -y
 ${PM} clean all
@@ -372,11 +387,12 @@ configure_firewall() {
 local port=$1
 if [ -z "$port" ]; then return; fi
 log_info "正在配置防火墙放行端口 ${port}..."
+export DEBIAN_FRONTEND=noninteractive
 case "${ID}" in
 "ubuntu" | "debian")
 if ! command -v ufw >/dev/null; then
 log_warn "未检测到 ufw,正在安装..."
-${PM} install -y ufw
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ufw
 fi
 ufw allow "${port}"/tcp
 ;;
@@ -425,7 +441,7 @@ install_docker
 # 安全配置
 install_fail2ban
 
-# 用户与安全控制 (新增部分)
+# 用户与安全控制
 create_admin_user
 
 # Shell 配置
