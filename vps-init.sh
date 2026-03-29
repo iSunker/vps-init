@@ -43,12 +43,12 @@ update_system() {
     if [ "${PM}" = "apt" ]; then
         # 设置非交互模式，避免配置文件冲突提示
         export DEBIAN_FRONTEND=noninteractive
-        sudo apt update
-        sudo apt upgrade --only-upgrade -y \
+        apt update
+        apt upgrade --only-upgrade -y \
             -o Dpkg::Options::="--force-confold" \
             -o Dpkg::Options::="--force-confdef"
     elif [ "${PM}" = "yum" ]; then
-        sudo yum update -y
+        yum update -y
     fi
     log_info "系统更新完成"
 }
@@ -79,7 +79,7 @@ install_tool() {
     fi
     if ask_user "安装 ${name}" "${description}"; then
         log_warn "${name} 未安装,正在安装..."
-        sudo ${PM} install -y "${name}"
+        ${PM} install -y "${name}"
         if [ $? -eq 0 ]; then
             log_info "${name} 安装成功"
         else
@@ -98,7 +98,7 @@ install_tool_no_ask() {
         return 0
     fi
     log_warn "${name} 未安装,正在安装..."
-    sudo ${PM} install -y "${name}"
+    ${PM} install -y "${name}"
     if [ $? -eq 0 ]; then
         log_info "${name} 安装成功"
     else
@@ -113,9 +113,9 @@ set_timezone() {
     if ask_user "设置时区为上海时间" "将系统时区修改为 Asia/Shanghai"; then
         log_info "正在设置时区..."
         if command -v timedatectl >/dev/null; then
-            sudo timedatectl set-timezone Asia/Shanghai
+            timedatectl set-timezone Asia/Shanghai
         else
-            sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+            ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
         fi
         log_info "时区已设置为:$(date)"
     else
@@ -128,22 +128,22 @@ set_language() {
         log_info "正在设置语言环境..."
         if [ "${PM}" = "apt" ]; then
             if ! command -v locale-gen >/dev/null; then
-                sudo apt install -y locales
+                apt install -y locales
             fi
             if [ -f /etc/locale.gen ]; then
-                sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-                sudo locale-gen
+                sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+                locale-gen
             else
-                sudo locale-gen en_US.UTF-8
+                locale-gen en_US.UTF-8
             fi
         fi
         if command -v localectl >/dev/null; then
-            sudo localectl set-locale LANG=en_US.UTF-8
+            localectl set-locale LANG=en_US.UTF-8
         else
-            echo "LANG=en_US.UTF-8" | sudo tee /etc/locale.conf
-            echo "LC_ALL=en_US.UTF-8" | sudo tee -a /etc/locale.conf
+            echo "LANG=en_US.UTF-8" | tee /etc/locale.conf
+            echo "LC_ALL=en_US.UTF-8" | tee -a /etc/locale.conf
             if [ -f /etc/default/locale ]; then
-                echo "LANG=en_US.UTF-8" | sudo tee /etc/default/locale
+                echo "LANG=en_US.UTF-8" | tee /etc/default/locale
             fi
         fi
         log_info "语言设置已更新"
@@ -160,14 +160,14 @@ enable_bbr() {
         if grep -q "net.core.default_qdisc=fq" "$sysctl_conf" && grep -q "net.ipv4.tcp_congestion_control=bbr" "$sysctl_conf"; then
             log_info "BBR 配置已存在于 $sysctl_conf"
         else
-            sudo cp "$sysctl_conf" "${sysctl_conf}.backup.$(date +%Y%m%d_%H%M%S)"
+            cp "$sysctl_conf" "${sysctl_conf}.backup.$(date +%Y%m%d_%H%M%S)"
             if ! grep -q "net.core.default_qdisc=fq" "$sysctl_conf"; then
-                echo "net.core.default_qdisc=fq" | sudo tee -a "$sysctl_conf"
+                echo "net.core.default_qdisc=fq" >> "$sysctl_conf"
             fi
             if ! grep -q "net.ipv4.tcp_congestion_control=bbr" "$sysctl_conf"; then
-                echo "net.ipv4.tcp_congestion_control=bbr" | sudo tee -a "$sysctl_conf"
+                echo "net.ipv4.tcp_congestion_control=bbr" >> "$sysctl_conf"
             fi
-            sudo sysctl -p
+            sysctl -p
             log_info "BBR 已开启"
         fi
     fi
@@ -177,12 +177,12 @@ configure_swap() {
     if ask_user "增加 2GB Swap" "虚拟内存,防止小内存机器死机"; then
         log_info "正在配置 Swap..."
         if [ ! -f /swapfile ]; then
-            sudo fallocate -l 2G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
+            fallocate -l 2G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
             if ! grep -q "/swapfile" /etc/fstab; then
-                echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+                echo '/swapfile none swap sw 0 0' >> /etc/fstab
             fi
             log_info "Swap 创建成功"
             free -h
@@ -196,9 +196,9 @@ configure_swap() {
 optimize_dns() {
     if ask_user "优化 DNS 解析" "使用 Google (8.8.8.8) 和 Cloudflare (1.1.1.1) DNS"; then
         log_info "正在优化 DNS..."
-        [ -f /etc/resolv.conf ] && sudo cp /etc/resolv.conf /etc/resolv.conf.backup.$(date +%Y%m%d_%H%M%S)
-        echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
-        echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf
+        [ -f /etc/resolv.conf ] && cp /etc/resolv.conf /etc/resolv.conf.backup.$(date +%Y%m%d_%H%M%S)
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        echo "nameserver 1.1.1.1" >> /etc/resolv.conf
         log_info "DNS 已更新"
     fi
 }
@@ -207,8 +207,8 @@ install_fail2ban() {
     if ask_user "安装 Fail2Ban" "防止 SSH 暴力破解"; then
         log_info "正在安装 Fail2Ban..."
         install_tool_no_ask "fail2ban"
-        sudo systemctl enable fail2ban
-        sudo systemctl start fail2ban
+        systemctl enable fail2ban
+        systemctl start fail2ban
         log_info "Fail2Ban 安装并启动成功"
     fi
 }
@@ -217,11 +217,11 @@ remove_cloud_init() {
     if ask_user "卸载 Cloud-init" "Netcup/VPS 镜像自带工具,装完系统后卸载可加快开机"; then
         log_info "正在清理 Cloud-init..."
         if [ "${PM}" = "apt" ]; then
-            sudo apt purge cloud-init -y
+            apt purge cloud-init -y
         elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
-            sudo ${PM} remove cloud-init -y
+            ${PM} remove cloud-init -y
         fi
-        sudo rm -rf /etc/cloud /var/lib/cloud
+        rm -rf /etc/cloud /var/lib/cloud
         log_info "Cloud-init 清理完成"
     fi
 }
@@ -241,21 +241,20 @@ install_docker() {
 
         # 使用官方脚本
         curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
+        sh get-docker.sh
 
         # 清理脚本
         rm get-docker.sh
 
         # 启动 Docker
         log_info "启动 Docker 服务..."
-        sudo systemctl enable docker
-        sudo systemctl start docker
+        systemctl enable docker
+        systemctl start docker
 
         if command -v docker >/dev/null; then
             log_info "Docker 安装成功!"
             log_info "Docker 版本:$(docker --version)"
             log_info "Compose 版本:$(docker compose version)"
-            log_warn "注意:如果是非 root 用户,请手动执行 'sudo usermod -aG docker \$USER' 并重新登录"
         else
             log_error "Docker 安装似乎失败了,请检查网络或日志"
             exit 1
@@ -268,11 +267,11 @@ install_docker() {
 system_cleanup() {
     log_info "正在执行系统清理..."
     if [ "${PM}" = "apt" ]; then
-        sudo apt autoremove -y
-        sudo apt clean
+        apt autoremove -y
+        apt clean
     elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
-        sudo ${PM} autoremove -y
-        sudo ${PM} clean all
+        ${PM} autoremove -y
+        ${PM} clean all
     fi
     log_info "系统清理完成"
 }
@@ -287,7 +286,7 @@ config_zsh() {
     log_info "配置 zshrc 文件"
     sed -i "s/^plugins=.*/plugins=(git z wd extract zsh-autosuggestions zsh-syntax-highlighting command-not-found)/g" ~/.zshrc
     if ! grep -q "/usr/bin/zsh" /etc/shells; then
-        echo "/usr/bin/zsh" | sudo tee -a /etc/shells
+        echo "/usr/bin/zsh" >>/etc/shells
     fi
     log_info "设置 zsh 为默认 shell"
     chsh -s $(which zsh)
@@ -320,22 +319,22 @@ change_ssh_port() {
         fi
         local backup_file="/etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)"
         log_info "备份配置文件到 ${backup_file}"
-        sudo cp /etc/ssh/sshd_config "${backup_file}"
+        cp /etc/ssh/sshd_config "${backup_file}"
         log_info "修改 ssh 端口号为 ${SSH_PORT}"
-        sudo sed -i "s/^#Port.*/Port ${SSH_PORT}/g" /etc/ssh/sshd_config
-        sudo sed -i "s/^Port.*/Port ${SSH_PORT}/g" /etc/ssh/sshd_config
+        sed -i "s/^#Port.*/Port ${SSH_PORT}/g" /etc/ssh/sshd_config
+        sed -i "s/^Port.*/Port ${SSH_PORT}/g" /etc/ssh/sshd_config
 
-        if ! sudo sshd -t; then
+        if ! sshd -t; then
             log_error "SSH 配置文件语法检查失败,正在还原配置..."
-            sudo cp "${backup_file}" /etc/ssh/sshd_config
+            cp "${backup_file}" /etc/ssh/sshd_config
             return
         fi
 
         log_info "重启 ssh 服务"
-        if ! sudo systemctl restart sshd; then
+        if ! systemctl restart sshd; then
             log_error "SSH 服务重启失败,还原配置..."
-            sudo cp "${backup_file}" /etc/ssh/sshd_config
-            sudo systemctl restart sshd
+            cp "${backup_file}" /etc/ssh/sshd_config
+            systemctl restart sshd
             return
         fi
 
@@ -353,19 +352,19 @@ configure_firewall() {
         "ubuntu" | "debian")
             if ! command -v ufw >/dev/null; then
                 log_warn "未检测到 ufw,正在安装..."
-                sudo ${PM} install -y ufw
+                ${PM} install -y ufw
             fi
-            sudo ufw allow "${port}"/tcp
+            ufw allow "${port}"/tcp
             ;;
         "centos" | "fedora")
             if ! command -v firewall-cmd >/dev/null; then
                 log_warn "未检测到 firewalld,正在安装..."
-                sudo ${PM} install -y firewalld
-                sudo systemctl enable firewalld
-                sudo systemctl start firewalld
+                ${PM} install -y firewalld
+                systemctl enable firewalld
+                systemctl start firewalld
             fi
-            sudo firewall-cmd --permanent --add-port="${port}"/tcp
-            sudo firewall-cmd --reload
+            firewall-cmd --permanent --add-port="${port}"/tcp
+            firewall-cmd --reload
             ;;
         *)
             log_warn "未知的系统类型,请手动配置防火墙规则"
@@ -393,32 +392,32 @@ create_admin_user() {
         log_info "正在创建用户 $NEW_USER..."
         
         # 创建用户
-        sudo useradd -m -s /bin/bash "$NEW_USER"
+        useradd -m -s /bin/bash "$NEW_USER"
         
         # 设置密码
         log_info "请为用户 $NEW_USER 设置密码:"
-        sudo passwd "$NEW_USER"
+        passwd "$NEW_USER"
         
         # 添加到 sudo 组
         log_info "正在添加 sudo 权限..."
         if [ "${PM}" = "apt" ]; then
-            sudo usermod -aG sudo "$NEW_USER"
+            usermod -aG sudo "$NEW_USER"
             # 确保 sudo 已安装
             if ! command -v sudo >/dev/null; then
-                sudo apt install -y sudo
+                apt install -y sudo
             fi
         elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
-            sudo usermod -aG wheel "$NEW_USER"
+            usermod -aG wheel "$NEW_USER"
             # 确保 sudo 已安装
             if ! command -v sudo >/dev/null; then
-                sudo ${PM} install -y sudo
+                ${PM} install -y sudo
             fi
             # 确保 wheel 组有 sudo 权限
             if grep -q "^# %wheel.*ALL=(ALL).*ALL" /etc/sudoers; then
-                sudo sed -i 's/^# %wheel\(.*\)ALL=(ALL)\(.*\)ALL/%wheel\1ALL=(ALL)\2ALL/' /etc/sudoers
+                sed -i 's/^# %wheel\(.*\)ALL=(ALL)\(.*\)ALL/%wheel\1ALL=(ALL)\2ALL/' /etc/sudoers
                 log_info "已启用 wheel 组的 sudo 权限"
             elif ! grep -q "^%wheel.*ALL=(ALL).*ALL" /etc/sudoers; then
-                echo "%wheel ALL=(ALL) ALL" | sudo EDITOR='tee -a' visudo
+                echo "%wheel ALL=(ALL) ALL" | EDITOR='tee -a' visudo
                 log_info "已添加 wheel 组的 sudo 权限"
             fi
         fi
@@ -451,38 +450,38 @@ disable_root_login() {
             [yY][eE][sS] | [yY])
                 local backup_file="/etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)"
                 log_info "备份配置文件到 ${backup_file}"
-                sudo cp /etc/ssh/sshd_config "${backup_file}"
+                cp /etc/ssh/sshd_config "${backup_file}"
                 
                 log_info "正在修改 SSH 配置..."
                 # 禁用 root 登录
                 if grep -q "^PermitRootLogin" /etc/ssh/sshd_config; then
-                    sudo sed -i "s/^PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
+                    sed -i "s/^PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
                 elif grep -q "^#PermitRootLogin" /etc/ssh/sshd_config; then
-                    sudo sed -i "s/^#PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
+                    sed -i "s/^#PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
                 else
-                    echo "PermitRootLogin no" | sudo tee -a /etc/ssh/sshd_config
+                    echo "PermitRootLogin no" >> /etc/ssh/sshd_config
                 fi
                 
                 # 验证配置文件语法
-                if ! sudo sshd -t; then
+                if ! sshd -t; then
                     log_error "SSH 配置文件语法检查失败,正在还原配置..."
-                    sudo cp "${backup_file}" /etc/ssh/sshd_config
+                    cp "${backup_file}" /etc/ssh/sshd_config
                     return
                 fi
                 
                 log_info "重启 SSH 服务..."
-                if ! sudo systemctl restart sshd; then
+                if ! systemctl restart sshd; then
                     log_error "SSH 服务重启失败,还原配置..."
-                    sudo cp "${backup_file}" /etc/ssh/sshd_config
-                    sudo systemctl restart sshd
+                    cp "${backup_file}" /etc/ssh/sshd_config
+                    systemctl restart sshd
                     return
                 fi
                 
                 log_info "root 登录已成功禁用!"
                 log_warn "请立即在新终端测试管理员用户是否能正常登录"
                 log_warn "如果无法登录,请使用当前连接还原配置:"
-                log_warn "  sudo cp ${backup_file} /etc/ssh/sshd_config"
-                log_warn "  sudo systemctl restart sshd"
+                log_warn "  cp ${backup_file} /etc/ssh/sshd_config"
+                log_warn "  systemctl restart sshd"
                 ;;
             *)
                 log_info "已取消禁用 root 登录"
