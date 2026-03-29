@@ -369,6 +369,121 @@ configure_firewall() {
     log_info "防火墙规则配置尝试完成"
 }
 
+# --- 新增:创建管理员用户 ---
+create_admin_user() {
+    if ask_user "创建管理员用户" "创建一个具有 sudo 权限的非 root 用户"; then
+        read -p "请输入新用户名: " NEW_USER
+        
+        # 验证用户名
+        if [ -z "$NEW_USER" ]; then
+            log_error "用户名不能为空"
+            return
+        fi
+        
+        if id "$NEW_USER" &>/dev/null; then
+            log_warn "用户 $NEW_USER 已存在,跳过创建"
+            return
+        fi
+        
+        log_info "正在创建用户 $NEW_USER..."
+        
+        # 创建用户
+        useradd -m -s /bin/bash "$NEW_USER"
+        
+        # 设置密码
+        log_info "请为用户 $NEW_USER 设置密码:"
+        passwd "$NEW_USER"
+        
+        # 添加到 sudo 组
+        log_info "正在添加 sudo 权限..."
+        if [ "${PM}" = "apt" ]; then
+            usermod -aG sudo "$NEW_USER"
+            # 确保 sudo 已安装
+            if ! command -v sudo >/dev/null; then
+                apt install -y sudo
+            fi
+        elif [ "${PM}" = "yum" ] || [ "${PM}" = "dnf" ]; then
+            usermod -aG wheel "$NEW_USER"
+            # 确保 sudo 已安装
+            if ! command -v sudo >/dev/null; then
+                ${PM} install -y sudo
+            fi
+            # 确保 wheel 组有 sudo 权限
+            if ! grep -q "^%wheel" /etc/sudoers; then
+                echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+            fi
+        fi
+        
+        log_info "用户 $NEW_USER 创建成功!"
+        log_info "请使用 'su - $NEW_USER' 切换到新用户测试"
+        log_warn "强烈建议在禁用 root 登录前,先测试新用户是否能正常使用 sudo"
+    else
+        log_info "跳过创建管理员用户"
+    fi
+}
+
+# --- 新增:禁用 root 登录 ---
+disable_root_login() {
+    if [ ! -f /etc/ssh/sshd_config ]; then
+        log_error "/etc/ssh/sshd_config 文件不存在"
+        return
+    fi
+    
+    if ask_user "禁用 root SSH 登录" "增强安全性,禁止 root 用户通过 SSH 登录(请确保已创建管理员用户!)"; then
+        log_warn "===================== 重要警告 ====================="
+        log_warn "禁用 root 登录前,请确保:"
+        log_warn "1. 已创建管理员用户并测试可以正常登录"
+        log_warn "2. 管理员用户可以正常使用 sudo 命令"
+        log_warn "3. 当前保持一个 SSH 连接,以便出错时可以恢复"
+        log_warn "=================================================="
+        
+        read -p "确认要继续禁用 root 登录吗? [y/N]: " confirm
+        case "$confirm" in
+            [yY][eE][sS] | [yY])
+                local backup_file="/etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)"
+                log_info "备份配置文件到 ${backup_file}"
+                cp /etc/ssh/sshd_config "${backup_file}"
+                
+                log_info "正在修改 SSH 配置..."
+                # 禁用 root 登录
+                if grep -q "^PermitRootLogin" /etc/ssh/sshd_config; then
+                    sed -i "s/^PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
+                elif grep -q "^#PermitRootLogin" /etc/ssh/sshd_config; then
+                    sed -i "s/^#PermitRootLogin.*/PermitRootLogin no/g" /etc/ssh/sshd_config
+                else
+                    echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+                fi
+                
+                # 验证配置文件语法
+                if ! sshd -t; then
+                    log_error "SSH 配置文件语法检查失败,正在还原配置..."
+                    cp "${backup_file}" /etc/ssh/sshd_config
+                    return
+                fi
+                
+                log_info "重启 SSH 服务..."
+                if ! systemctl restart sshd; then
+                    log_error "SSH 服务重启失败,还原配置..."
+                    cp "${backup_file}" /etc/ssh/sshd_config
+                    systemctl restart sshd
+                    return
+                fi
+                
+                log_info "root 登录已成功禁用!"
+                log_warn "请立即在新终端测试管理员用户是否能正常登录"
+                log_warn "如果无法登录,请使用当前连接还原配置:"
+                log_warn "  cp ${backup_file} /etc/ssh/sshd_config"
+                log_warn "  systemctl restart sshd"
+                ;;
+            *)
+                log_info "已取消禁用 root 登录"
+                ;;
+        esac
+    else
+        log_info "跳过禁用 root 登录"
+    fi
+}
+
 run_script() {
     log_info "开始运行脚本..."
     detect_distribution
@@ -405,6 +520,10 @@ run_script() {
 
     # 网络与安全
     change_ssh_port
+    
+    # 用户管理与安全加固(新增)
+    create_admin_user
+    disable_root_login
 
     # 清理
     system_cleanup
