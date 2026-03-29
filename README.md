@@ -4,11 +4,22 @@
 
 ## 快速使用
 
-在新 VPS 上执行:
+##在新 VPS 上以root用户执行:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh | sudo bash
+##正确的执行方法
+方法1：直接执行
+curl -fsSL https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh | bash
+方法2：先下载再执行
+# 下载脚本
+curl -O https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh
 
+# 添加执行权限
+chmod +x vps-init.sh
+
+# 直接运行
+./vps-init.sh
+方法3：使用wget
+wget -qO- https://raw.githubusercontent.com/iSunker/vps-init/main/vps-init.sh | bash
 功能特性
 ✅ 系统更新
 ✅ 时区设置(上海)
